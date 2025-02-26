@@ -1,0 +1,19 @@
+[package]
+name = "stof-http-runner"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "stof-runner"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.96"
+axum = "0.8.1"
+clap = { version = "4.5.31", features = ["derive"] }
+colored = "3.0.0"
+stof = "0.3.11"
+stof-http = "0.2.3"
+tokio = { version = "1.43.0", features = ["full"] }
+tower-http = "0.6.2"
+tower_governor = "0.6.0"

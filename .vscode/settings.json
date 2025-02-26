@@ -1,0 +1,13 @@
+{
+    "workbench.colorCustomizations": {
+        "titleBar.activeBackground": "#51ebff",
+        "titleBar.activeForeground": "#000000",
+        "titleBar.inactiveForeground": "#51ebff",
+        "titleBar.border": "#51ebff",
+        "activityBar.activeBackground": "#51ebff",
+        "activityBar.activeBorder": "#51ebff",
+        "activityBar.inactiveForeground": "#51ebff",
+        "activityBar.foreground": "#000",
+    },
+    "rust-analyzer.showUnlinkedFileNotification": false,
+}
