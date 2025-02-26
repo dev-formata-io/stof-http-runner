@@ -1,11 +1,15 @@
 [package]
-name = "stof-http-runner"
+name = "stof-runner"
 version = "0.1.0"
 edition = "2024"
 
 [[bin]]
 name = "stof-runner"
 path = "src/main.rs"
+
+[lib]
+name = "runner"
+path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0.96"

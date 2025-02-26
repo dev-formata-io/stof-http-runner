@@ -22,6 +22,7 @@ pub use format::*;
 
 
 /// Add a stof document to this registry.
+#[allow(unused)]
 pub(crate) fn add_registry_doc(path: &str, format: &str, mut doc: SDoc) -> bool {
     let mut buf = path.split("/").collect::<Vec<&str>>();
     buf.pop();
@@ -38,6 +39,7 @@ pub(crate) fn add_registry_doc(path: &str, format: &str, mut doc: SDoc) -> bool 
 }
 
 /// Get a stof document from the registry.
+#[allow(unused)]
 pub(crate) fn get_registry_doc(path: &str, format: &str) -> Option<SDoc> {
     if let Ok(doc) = SDoc::file(path, format) {
         Some(doc)
@@ -47,6 +49,7 @@ pub(crate) fn get_registry_doc(path: &str, format: &str) -> Option<SDoc> {
 }
 
 /// Delete a stof document from the registry.
+#[allow(unused)]
 pub(crate) fn delete_registry_doc(path: &str) -> bool {
     fs::remove_file(path).is_ok()
 }
