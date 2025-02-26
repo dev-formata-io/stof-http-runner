@@ -24,7 +24,7 @@ use tokio::{sync::Mutex, time::timeout};
 use tower_governor::{governor::GovernorConfig, GovernorLayer};
 use tower_http::cors::CorsLayer;
 
-use crate::registry::{add_registry_doc, delete_registry_doc, get_registry_doc};
+use crate::registry::{add_registry_doc, delete_registry_doc, get_registry_doc, LocalRegistryFormat};
 
 
 /// Server state.
@@ -175,8 +175,13 @@ pub async fn run_server(config: SDoc) {
 
 /// Sandbox a document for execution on this server.
 /// Add libraries that this server offers.
-pub fn sandbox_document(doc: &mut SDoc) {
+pub async fn sandbox_document(doc: &mut SDoc, state: ServerState) {
     doc.libraries.libraries.remove("fs");
+
+    // Add local registry format
+    doc.load_format(Arc::new(LocalRegistryFormat {
+        registry: state.registry_path().await,
+    }));
 }
 
 /// Add fs library to a document.
@@ -196,7 +201,7 @@ async fn put_request_handler(State(state): State<ServerState>, Path(path): Path<
     }
     
     let mut doc = SDoc::default();
-    sandbox_document(&mut doc);
+    sandbox_document(&mut doc, state.clone()).await;
     let res = doc.header_import("main", &content_type, &content_type, &mut body, "");
     match res {
         Ok(_) => {
@@ -274,7 +279,7 @@ async fn post_request_handler(State(state): State<ServerState>, Query(query): Qu
         }
         
         let mut doc = SDoc::default();
-        sandbox_document(&mut doc);
+        sandbox_document(&mut doc, state.clone()).await;
         let res = doc.header_import("main", &content_type, &content_type, &mut body, "");
         match res {
             Ok(_) => {

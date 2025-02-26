@@ -28,7 +28,7 @@ type Server {
 
     // Show Stof errors in responses?
     // Set to false to return opaque errors instead.
-    errors: bool = false;
+    errors: bool = true;
 
     // Can execute stof?
     run_stof: bool = true;
@@ -51,6 +51,7 @@ type Registry {
 type Runner {
     #[schema]
     server: Server = new Server {};
+    
     #[schema]
     registry: Registry = new Registry {};
 

@@ -17,6 +17,9 @@
 use std::fs;
 use stof::SDoc;
 
+pub mod format;
+pub use format::*;
+
 
 /// Add a stof document to this registry.
 pub(crate) fn add_registry_doc(path: &str, format: &str, mut doc: SDoc) -> bool {
