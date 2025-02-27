@@ -14,9 +14,8 @@
 // limitations under the License.
 //
 
-use std::fs;
-use axum::body::Bytes;
 use stof::{lang::SError, Format};
+use super::create_registry_doc;
 
 
 /// Local registry format.
@@ -31,17 +30,11 @@ impl Format for LocalRegistryFormat {
 
     /// File import.
     fn file_import(&self, pid: &str, doc: &mut stof::SDoc, _format: &str, full_path: &str, _extension: &str, as_name: &str) -> Result<(), stof::lang::SError> {
-        let mut path = format!("{}/{}", self.registry, full_path);
-        if !path.ends_with(".bstof") {
-            let mut buf = path.split('.').collect::<Vec<&str>>();
-            if buf.len() > 1 {
-                buf.pop();
-                path = buf.join(".");
+        let path = format!("{}/{}", self.registry, full_path);
+        if let Some(reg_doc) = create_registry_doc(&path) {
+            if let Ok(mut bytes) = reg_doc.export_bytes("main", "bstof", None) {
+                return doc.header_import(pid, "bstof", "bstof", &mut bytes, as_name);
             }
-            path = format!("{}.bstof", path);
-        }
-        if let Ok(bytes) = fs::read(&path) {
-            return doc.header_import(pid, "bstof", "bstof", &mut Bytes::from(bytes), as_name);
         }
         Err(SError::custom(pid, doc, "LocalRegistryError", "document not found"))
     }

@@ -180,6 +180,19 @@ impl StofResponse {
         }
     }
 
+    /// Bytes response.
+    pub fn bytes(code: StatusCode, bytes: Bytes) -> Self {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, "application/octet-stream".parse().unwrap());
+
+        Self {
+            headers,
+            status: code,
+            str_body: Default::default(),
+            bytes_body: Some(bytes),
+        }
+    }
+
     /// BSTOF response.
     pub fn bstof(code: StatusCode, bytes: Bytes) -> Self {
         let mut headers = HeaderMap::new();

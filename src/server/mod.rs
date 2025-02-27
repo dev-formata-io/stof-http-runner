@@ -19,12 +19,12 @@ use response::StofResponse;
 
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 use axum::{body::Bytes, extract::{Path, Query, State}, http::{header::CONTENT_TYPE, HeaderMap, StatusCode}, response::IntoResponse, routing::{get, post}, Router};
-use stof::{FileSystemLibrary, SDoc, SField, SUnits, SVal};
+use stof::{SDoc, SField, SUnits, SVal};
 use tokio::{sync::Mutex, time::timeout};
 use tower_governor::{governor::GovernorConfig, GovernorLayer};
 use tower_http::cors::CorsLayer;
 
-use crate::registry::{add_registry_doc, delete_registry_doc, get_registry_doc, LocalRegistryFormat};
+use crate::registry::{add_registry_pkg, delete_registry_pkg, get_registry_pkg, LocalRegistryFormat};
 
 
 /// Server state.
@@ -184,47 +184,24 @@ pub async fn sandbox_document(doc: &mut SDoc, state: ServerState) {
     }));
 }
 
-/// Add fs library to a document.
-fn add_fs(doc: &mut SDoc) {
-    doc.load_lib(Arc::new(FileSystemLibrary::default()));
-}
-
-/// Put request handler - add an interface to the registry.
-async fn put_request_handler(State(state): State<ServerState>, Path(path): Path<String>, Query(_query): Query<BTreeMap<String, String>>, headers: HeaderMap, mut body: Bytes) -> impl IntoResponse {
+/// Put request handler - add a package to the registry.
+async fn put_request_handler(State(state): State<ServerState>, Path(path): Path<String>, Query(query): Query<BTreeMap<String, String>>, _headers: HeaderMap, body: Bytes) -> impl IntoResponse {
     if !state.registry_enabled().await {
         return StofResponse::error(StatusCode::NOT_IMPLEMENTED, "registry is not enabled");
     }
+
+    let registry_path = state.registry_path().await;
+    let path = format!("{}/{}", registry_path, path);
     
-    let mut content_type = String::from("stof");
-    if let Some(ctype) = headers.get(CONTENT_TYPE) {
-        content_type = ctype.to_str().unwrap().to_owned();
+    let mut overwrite = true;
+    if let Some(q_overwrite) = query.get("overwrite") {
+        overwrite = q_overwrite == "true";
     }
     
-    let mut doc = SDoc::default();
-    sandbox_document(&mut doc, state.clone()).await;
-    let res = doc.header_import("main", &content_type, &content_type, &mut body, "");
-    match res {
-        Ok(_) => {
-            let registry_path = state.registry_path().await;
-            let mut path = format!("{}/{}", registry_path, path);
-            if !path.ends_with(".bstof") {
-                path = format!("{}.bstof", path);
-            }
-
-            add_fs(&mut doc); // needed for adding to registry
-            let res = add_registry_doc(&path, "bstof", doc);
-            if !res {
-                return StofResponse::error(StatusCode::INTERNAL_SERVER_ERROR, "error creating registry document");
-            }
-            StofResponse::msg(StatusCode::OK, "successfully added document")
-        },
-        Err(error) => {
-            let stof_errors = state.stof_errors().await;
-            if stof_errors {
-                return StofResponse::error(StatusCode::BAD_REQUEST, &error.to_string(&doc.graph));
-            }
-            StofResponse::error(StatusCode::BAD_REQUEST, "error creating document")
-        },
+    if add_registry_pkg(&path, overwrite, body) {
+        StofResponse::msg(StatusCode::OK, "package created")
+    } else {
+        StofResponse::error(StatusCode::BAD_REQUEST, "package not created")
     }
 }
 
@@ -235,15 +212,12 @@ async fn delete_request_handler(State(state): State<ServerState>, Path(path): Pa
     }
 
     let registry_path = state.registry_path().await;
-    let mut path = format!("{}/{}", registry_path, path);
-    if !path.ends_with(".bstof") {
-        path = format!("{}.bstof", path);
-    }
+    let path = format!("{}/{}", registry_path, path);
 
-    if delete_registry_doc(&path) {
-        return StofResponse::msg(StatusCode::OK, "successfully removed document");
+    if delete_registry_pkg(&path) {
+        return StofResponse::msg(StatusCode::OK, "package removed");
     }
-    StofResponse::error(StatusCode::NOT_FOUND, "did not find a document in this location")
+    StofResponse::error(StatusCode::NOT_FOUND, "package not found")
 }
 
 /// Get request handler - get an interface from a registry.
@@ -253,17 +227,12 @@ async fn get_request_handler(State(state): State<ServerState>, Path(path): Path<
     }
     
     let registry_path = state.registry_path().await;
-    let mut path = format!("{}/{}", registry_path, path);
-    if !path.ends_with(".bstof") {
-        path = format!("{}.bstof", path);
-    }
+    let path = format!("{}/{}", registry_path, path);
 
-    if let Some(doc) = get_registry_doc(&path, "bstof") {
-        if let Ok(bytes) = doc.export_bytes("main", "bstof", None) {
-            return StofResponse::bstof(StatusCode::OK, bytes);
-        }
+    if let Some(bytes) = get_registry_pkg(&path) {
+        return StofResponse::bytes(StatusCode::OK, bytes);
     }
-    StofResponse::error(StatusCode::NOT_FOUND, "document not found")
+    StofResponse::error(StatusCode::NOT_FOUND, "package not found")
 }
 
 /// Post request handler - run some stof.
