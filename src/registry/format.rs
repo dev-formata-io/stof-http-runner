@@ -30,7 +30,7 @@ impl Format for LocalRegistryFormat {
 
     /// File import.
     fn file_import(&self, pid: &str, doc: &mut stof::SDoc, _format: &str, full_path: &str, _extension: &str, as_name: &str) -> Result<(), stof::lang::SError> {
-        let path = format!("{}/{}", self.registry, full_path);
+        let path = format!("{}/{}", self.registry, full_path.trim_end_matches(".stof"));
         if let Some(reg_doc) = create_registry_doc(&path) {
             if let Ok(mut bytes) = reg_doc.export_bytes("main", "bstof", None) {
                 return doc.header_import(pid, "bstof", "bstof", &mut bytes, as_name);

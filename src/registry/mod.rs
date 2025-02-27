@@ -86,6 +86,7 @@ pub fn create_registry_doc(path: &str) -> Option<SDoc> {
     if let Ok(file) = fs::File::open(&file_path) {
         if let Ok(mut archive) = zip::ZipArchive::new(file) {
             let tmp_dir_name = nanoid!();
+            let _ = fs::create_dir_all(&tmp_dir_name);
 
             // extract all files to the temp dir location
             for i in 0..archive.len() {
@@ -114,7 +115,7 @@ pub fn create_registry_doc(path: &str) -> Option<SDoc> {
             }
 
             // import the package into a document
-            if let Ok(doc) = SDoc::file(&tmp_dir_name, "pkg") {
+            if let Ok(doc) = SDoc::file(&format!("{}.stof", tmp_dir_name), "pkg") {
                 let _ = fs::remove_dir_all(&tmp_dir_name);
                 return Some(doc);
             }
