@@ -257,8 +257,17 @@ async fn post_request_handler(State(state): State<ServerState>, Query(query): Qu
         }
         
         let mut doc = SDoc::default();
-        sandbox_document(&mut doc, state.clone()).await;
-        let res = doc.header_import("main", &content_type, &content_type, &mut body, "");
+        let res;
+        if content_type == "pkg" {
+            // need to import the pkg before we sandbox the document of course...
+            // TODO: security vulnerability - a hack could be executing a package and using the fs lib to crawl this server...
+            res = doc.header_import("main", &content_type, &content_type, &mut body, "");
+            sandbox_document(&mut doc, state.clone()).await;
+        } else {
+            sandbox_document(&mut doc, state.clone()).await;
+            res = doc.header_import("main", &content_type, &content_type, &mut body, "");
+        }
+        
         match res {
             Ok(_) => {
                 // Execute the main root as a task
