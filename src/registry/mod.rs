@@ -14,9 +14,8 @@
 // limitations under the License.
 //
 
-use std::{fs, io, path::PathBuf};
+use std::fs;
 use bytes::Bytes;
-use nanoid::nanoid;
 use stof::SDoc;
 
 pub mod format;
@@ -83,43 +82,9 @@ pub fn create_registry_doc(path: &str) -> Option<SDoc> {
         return None;
     }
 
-    if let Ok(file) = fs::File::open(&file_path) {
-        if let Ok(mut archive) = zip::ZipArchive::new(file) {
-            let tmp_dir_name = nanoid!();
-            let _ = fs::create_dir_all(&tmp_dir_name);
-
-            // extract all files to the temp dir location
-            for i in 0..archive.len() {
-                let mut file = archive.by_index(i).unwrap();
-                
-                let outname = match file.enclosed_name() {
-                    Some(path) => path,
-                    None => continue,
-                };
-                
-                let mut outpath = PathBuf::from(&tmp_dir_name);
-                outpath.push(outname);
-                
-                if file.is_dir() {
-                    let _ = fs::create_dir_all(&outpath);
-                } else {
-                    if let Some(p) = outpath.parent() {
-                        if !p.exists() {
-                            let _ = fs::create_dir_all(p);
-                        }
-                    }
-                    if let Ok(mut outfile) = fs::File::create(&outpath) {
-                        let _ = io::copy(&mut file, &mut outfile);
-                    }
-                }
-            }
-
-            // import the package into a document
-            if let Ok(doc) = SDoc::file(&format!("{}.stof", tmp_dir_name), "pkg") {
-                let _ = fs::remove_dir_all(&tmp_dir_name);
-                return Some(doc);
-            }
-            let _ = fs::remove_dir_all(&tmp_dir_name);
+    if let Ok(bytes) = fs::read(&file_path) {
+        if let Ok(doc) = SDoc::bytes(Bytes::from(bytes), "pkg") {
+            return Some(doc);
         }
     }
     None

@@ -189,6 +189,9 @@ async fn put_request_handler(State(state): State<ServerState>, Path(path): Path<
     if !state.registry_enabled().await {
         return StofResponse::error(StatusCode::NOT_IMPLEMENTED, "registry is not enabled");
     }
+    if path.split('/').collect::<Vec<&str>>().len() < 2 {
+        return StofResponse::error(StatusCode::BAD_REQUEST, "package directory not found");
+    }
 
     let registry_path = state.registry_path().await;
     let path = format!("{}/{}", registry_path, path);
@@ -210,6 +213,9 @@ async fn delete_request_handler(State(state): State<ServerState>, Path(path): Pa
     if !state.registry_enabled().await {
         return StofResponse::error(StatusCode::NOT_IMPLEMENTED, "registry is not enabled");
     }
+    if path.split('/').collect::<Vec<&str>>().len() < 2 {
+        return StofResponse::error(StatusCode::BAD_REQUEST, "package directory not found");
+    }
 
     let registry_path = state.registry_path().await;
     let path = format!("{}/{}", registry_path, path);
@@ -224,6 +230,9 @@ async fn delete_request_handler(State(state): State<ServerState>, Path(path): Pa
 async fn get_request_handler(State(state): State<ServerState>, Path(path): Path<String>, Query(_query): Query<BTreeMap<String, String>>, _headers: HeaderMap) -> impl IntoResponse {
     if !state.registry_enabled().await {
         return StofResponse::error(StatusCode::NOT_IMPLEMENTED, "registry is not enabled");
+    }
+    if path.split('/').collect::<Vec<&str>>().len() < 2 {
+        return StofResponse::error(StatusCode::BAD_REQUEST, "package directory not found");
     }
     
     let registry_path = state.registry_path().await;
