@@ -15,4 +15,4 @@
 //
 
 pub mod registry;
-pub use registry::LocalRegistryFormat;
+//pub use registry::LocalRegistryFormat;

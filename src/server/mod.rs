@@ -19,6 +19,7 @@ use response::StofResponse;
 
 mod sandbox_fs;
 use sandbox_fs::TmpFileSystemLibrary;
+use stof_http::HTTPLibrary;
 
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 use axum::{body::Bytes, extract::{Path, Query, State}, http::{header::CONTENT_TYPE, HeaderMap, StatusCode}, response::IntoResponse, routing::{get, post}, Router};
@@ -27,7 +28,7 @@ use tokio::{sync::Mutex, time::timeout};
 use tower_governor::{governor::GovernorConfig, GovernorLayer};
 use tower_http::cors::CorsLayer;
 
-use crate::registry::{add_registry_pkg, delete_registry_pkg, get_registry_pkg, LocalRegistryFormat};
+use crate::registry::{add_registry_pkg, delete_registry_pkg, get_registry_pkg, LPKG};
 
 
 /// Server state.
@@ -179,12 +180,14 @@ pub async fn run_server(config: SDoc) {
 /// Sandbox a document for execution on this server.
 /// Add libraries that this server offers.
 pub async fn sandbox_document(doc: &mut SDoc, state: ServerState) {
-    doc.libraries.libraries.remove("fs");
+    // Replace the fs library with one that can only access the TMP directory
+    doc.load_lib(Arc::new(TmpFileSystemLibrary::default()));
 
-    // Add local registry format
-    doc.load_format(Arc::new(LocalRegistryFormat {
-        registry: state.registry_path().await,
-    }));
+    // Add HTTP library
+    doc.load_lib(Arc::new(HTTPLibrary::default()));
+
+    // Add local pkg registry format, replacing the native Stof PKG format
+    doc.load_format(Arc::new(LPKG::new(state.registry_path().await)));
 }
 
 /// Put request handler - add a package to the registry.
@@ -261,16 +264,7 @@ async fn post_request_handler(State(state): State<ServerState>, Query(query): Qu
         
         let mut doc = SDoc::default();
         sandbox_document(&mut doc, state.clone()).await;
-        let mut loaded_sbfs = false;
-        if content_type == "pkg" {
-            doc.load_lib(Arc::new(TmpFileSystemLibrary::default()));
-            loaded_sbfs = true;
-        }
         let res = doc.header_import("main", &content_type, &content_type, &mut body, "");
-        if loaded_sbfs {
-            doc.libraries.libraries.remove("fs");
-        }
-        
         match res {
             Ok(_) => {
                 // Execute the main root as a task

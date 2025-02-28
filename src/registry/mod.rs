@@ -18,8 +18,8 @@ use std::fs;
 use bytes::Bytes;
 use stof::SDoc;
 
-pub mod format;
-pub use format::*;
+pub mod pkg;
+pub use pkg::*;
 
 
 /// Add a registry package (ZIP file bytes).
@@ -71,6 +71,7 @@ pub fn get_registry_pkg(path: &str) -> Option<Bytes> {
 }
 
 /// Create a registry package document.
+#[allow(unused)]
 pub fn create_registry_doc(path: &str) -> Option<SDoc> {
     let mut file_path = path.to_string();
     if !file_path.ends_with(".zip") {
