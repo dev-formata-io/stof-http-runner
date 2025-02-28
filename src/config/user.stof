@@ -1,0 +1,136 @@
+//
+// Copyright 2024 Formata, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+// make sure the Users root exists
+root Users: {}
+
+type User {
+    username: str;
+
+    #[private]
+    password: str;
+
+    // yes or no to: execute stof, modify registry, read registry
+    // 0 is no permissions or the same as unauthenticated
+    perms: int = 0b000;
+
+    // modify scope
+    // if set, this user can only modify this registry within this scope
+    scope: str = '';
+
+    fn authenticated(password: str): bool {
+        return self.password == password;
+    }
+    fn can_read_registry(): bool {
+        return self.perms & 0b001 > 0;
+    }
+    fn can_modify_registry(): bool {
+        return self.perms & 0b010 > 0;
+    }
+    fn can_modify_scope(path: str): bool {
+        let user_scope = self.scope;
+        if (user_scope.len() < 1) return true;
+
+        let scope = path.split('/').first();
+        if (scope.startsWith('@')) scope = scope.substring(1);
+        return scope == user_scope;
+    }
+    fn can_exec(): bool {
+        return self.perms & 0b100 > 0;
+    }
+}
+
+obj Admin: {
+    // set a user
+    fn set_user(username: str, password: str, perms: int = 0b111, scope: str = ''): bool {
+        Users.removeField(username, true);
+        return Users.set(username, new User {
+            username: username,
+            password: password,
+            perms: perms,
+            scope: scope,
+        });
+    }
+
+    // delete a user by username
+    fn delete_user(username: str): bool {
+        return Users.removeField(username, true);
+    }
+
+    // export users to a json file
+    fn export_json_users(path: str) {
+        let json = stringify(Users, 'json');
+        fs.write(path, json);
+    }
+}
+
+// authenticate a user by username, returning the user if present
+fn authenticate(username: str, password: str): User {
+    let user: User = Users.at(username);
+    if (user && user.authenticated(password)) {
+        return user;
+    }
+    return null;
+}
+
+// can this user read the registry?
+fn can_read_registry(username: str, password: str): bool {
+    let user = self.authenticate(username, password);
+    return user && user.can_read_registry();
+}
+
+// can this user modify the registry?
+fn can_modify_registry(username: str, password: str, path: str = ''): bool {
+    let user = self.authenticate(username, password);
+    return user && user.can_modify_registry() && (path.len() < 1 || user.can_modify_scope(path));
+}
+
+// can this user exec on the server?
+fn can_exec(username: str, password: str): bool {
+    let user = self.authenticate(username, password);
+    return user && user.can_exec();
+}
+
+
+
+/*****************************************************************************
+ * TESTS.
+ *****************************************************************************/
+
+#[test]
+fn test_add_user() {
+    let user = 'test_add_user';
+    let pass = 'password';
+    assert(self.Admin.create_user(user, pass, 0b011));
+    assert(self.can_read_registry(user, pass));
+    assert(self.can_modify_registry(user, pass));
+    assertNot(self.can_exec(user, pass));
+    assertNot(self.can_read_registry(user, 'invalidpass'));
+
+    let use = self.authenticate(user, pass);
+    assertEq(use.perms, 0b011);
+
+    assert(self.Admin.set_permissions(user, 0b100));
+    assertNot(self.can_read_registry(user, pass));
+    assertNot(self.can_modify_registry(user, pass));
+    assert(self.can_exec(user, pass));
+
+    assert(self.Admin.delete_user(user));
+    assertNot(self.Admin.delete_user(user));
+    
+    use = self.authenticate(user, pass);
+    assertNull(use);
+}

@@ -41,9 +41,15 @@ type Registry {
 
     #[schema((value: str): bool => value.len() > 0)]
     path: str = 'registry';
+}
 
-    // TODO - statically defined users
-    // these will get merged with the registry/users.bstof file on startup
+// By default, the runner is unprotected
+type Admin {
+    username: str = 'admin'
+    password: str = ''
+
+    // permissions granted to any unauthenticated user
+    unauth_perms: int = 0b000;
 }
 
 type Runner {
@@ -53,11 +59,18 @@ type Runner {
     #[schema]
     registry: Registry = new Registry {};
 
+    #[schema]
+    admin: Admin = new Admin {};
+
     #[run]
     fn run() {
         self.valid = self.schemafy(self);
     }
 }
+
+fn unauth_read(): bool { return root.admin.unauth_perms & 0b001 > 0; }
+fn unauth_modify(): bool { return root.admin.unauth_perms & 0b010 > 0; }
+fn unauth_exec(): bool { return root.admin.unauth_perms & 0b100 > 0; }
 
 #[init]
 fn init() {
