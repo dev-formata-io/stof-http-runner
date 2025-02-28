@@ -47,18 +47,18 @@ impl LPKG {
 
     /// Create a temp zip file.
     #[allow(unused)]
-    pub fn create_temp_zip(&self, dir_path: &str, excluded: &HashSet<String>) -> Option<String> {
+    pub fn create_temp_zip(&self, dir_path: &str, included: &HashSet<String>, excluded: &HashSet<String>) -> Option<String> {
         let _ = fs::create_dir_all(&self.temp_dir);
-        let path = format!("{}/{}.zip", self.temp_dir, nanoid!());
-        LPKG::create_package_zip(dir_path, &path, excluded)
+        let path = format!("{}/{}.pkg", self.temp_dir, nanoid!());
+        LPKG::create_package_zip(dir_path, &path, included, excluded)
     }
 
     /// Create package zip file.
     /// If successful, returns a path to the newly created zip file (dest_path).
     #[allow(unused)]
-    pub fn create_package_zip(dir_path: &str, dest_path: &str, excluded: &HashSet<String>) -> Option<String> {
+    pub fn create_package_zip(dir_path: &str, dest_path: &str, included: &HashSet<String>, excluded: &HashSet<String>) -> Option<String> {
         let mut path = dest_path.to_string();
-        if !path.ends_with(".zip") { path = format!("{}.zip", path); }
+        if !path.ends_with(".pkg") { path = format!("{}.pkg", path); }
 
         // Make sure the destination directory exists
         let mut dir_pth_buf = path.split('/').collect::<Vec<&str>>();
@@ -69,7 +69,7 @@ impl LPKG {
         let file = fs::File::create(&path).unwrap();
         let walkdir = WalkDir::new(dir_path);
         let iter = walkdir.into_iter();
-        let res = LPKG::zip_directory(&mut iter.filter_map(|e| e.ok()), dir_path, file, zip::CompressionMethod::Bzip2, excluded);
+        let res = LPKG::zip_directory(&mut iter.filter_map(|e| e.ok()), dir_path, file, zip::CompressionMethod::Bzip2, included, excluded);
         if res.is_err() {
             return None;
         }
@@ -78,7 +78,7 @@ impl LPKG {
 
     /// Zip the directory into an output file.
     #[allow(unused)]
-    fn zip_directory<T: Write + Seek>(iter: &mut dyn Iterator<Item = DirEntry>, prefix: &str, writer: T, method: zip::CompressionMethod, excluded: &HashSet<String>) -> anyhow::Result<()> {
+    fn zip_directory<T: Write + Seek>(iter: &mut dyn Iterator<Item = DirEntry>, prefix: &str, writer: T, method: zip::CompressionMethod, included: &HashSet<String>, excluded: &HashSet<String>) -> anyhow::Result<()> {
         let mut zip = zip::ZipWriter::new(writer);
         let options = SimpleFileOptions::default().compression_method(method).unix_permissions(0o755);
 
@@ -86,25 +86,39 @@ impl LPKG {
         let mut buffer = Vec::new();
         'entries: for entry in iter {
             let path = entry.path();
-            
-            // don't add/publish any files that are in the reserved __stof__ directory
-            let display = path.display().to_string();
-            if display.contains("__stof__") {
-                continue;
-            }
-            for exclude in excluded {
-                if let Ok(re) = Regex::new(&exclude) {
-                    if re.is_match(&display) {
-                        continue 'entries;
-                    }
-                }
-            }
-
             let name = path.strip_prefix(pref).unwrap();
             let path_as_string = name
                 .to_str()
                 .map(str::to_owned)
                 .with_context(|| format!("{name:?} Is a Non UTF-8 Path"))?;
+
+            // Filter whether this file/dir should be included
+            if path_as_string.contains("__stof__") {
+                continue 'entries;
+            }
+            if included.len() > 0 {
+                let mut found_match = false;
+                for include in included {
+                    if let Ok(re) = Regex::new(&include) {
+                        if re.is_match(&path_as_string) {
+                            found_match = true;
+                            break;
+                        }
+                    }
+                }
+                if !found_match {
+                    continue 'entries;
+                }
+            }
+            if excluded.len() > 0 {
+                for exclude in excluded {
+                    if let Ok(re) = Regex::new(&exclude) {
+                        if re.is_match(&path_as_string) {
+                            continue 'entries;
+                        }
+                    }
+                }
+            }
 
             if path.is_file() {
                 zip.start_file(path_as_string, options)?;
@@ -128,7 +142,7 @@ impl LPKG {
         let outdir = format!("{}/{}", &self.temp_dir, nanoid!());
         let _ = fs::create_dir_all(&outdir);
         
-        let tmp_file_path = format!("{}/{}.zip", &self.temp_dir, nanoid!());
+        let tmp_file_path = format!("{}/{}.pkg", &self.temp_dir, nanoid!());
         let _ = fs::write(&tmp_file_path, bytes);
 
         LPKG::unzip_file(&tmp_file_path, &outdir);
@@ -174,7 +188,7 @@ impl LPKG {
     #[allow(unused)]
     pub fn unzip_pkg_bytes(&self, package_name_path: &str, bytes: &Bytes) -> String {
         let _ = fs::create_dir_all(&self.temp_dir);
-        let tmp_file_path = format!("{}/{}.zip", &self.temp_dir, nanoid!());
+        let tmp_file_path = format!("{}/{}.pkg", &self.temp_dir, nanoid!());
         let _ = fs::write(&tmp_file_path, bytes);
         let outdir = LPKG::unzip_pkg(package_name_path, &tmp_file_path);
         let _ = fs::remove_file(&tmp_file_path);
@@ -217,7 +231,7 @@ impl Format for LPKG {
     /// Import a directory containing a "pkg.stof" file.
     /// Import a zip file containing a "pkg.stof" file.
     fn file_import(&self, pid: &str, doc: &mut SDoc, _format: &str, full_path: &str, _extension: &str, as_name: &str) -> Result<(), SError> {
-        let full_path = format!("{}/{}.zip", self.registry, full_path.trim_start_matches("__stof__/").trim_end_matches(".stof"));
+        let full_path = format!("{}/{}.pkg", self.registry, full_path.trim_start_matches("__stof__/").trim_end_matches(".stof"));
 
         let cwd = format!("{}/{}", &self.temp_dir, nanoid!());
         LPKG::unzip_file(&full_path, &cwd);

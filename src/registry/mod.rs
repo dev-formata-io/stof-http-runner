@@ -30,8 +30,8 @@ pub fn add_registry_pkg(path: &str, overwrite: bool, bytes: Bytes) -> bool {
     let _ = fs::create_dir_all(&buf);
 
     let mut file_path = path.to_string();
-    if !file_path.ends_with(".zip") {
-        file_path.push_str(".zip");
+    if !file_path.ends_with(".pkg") {
+        file_path.push_str(".pkg");
     }
     
     let exists = fs::exists(&file_path);
@@ -46,8 +46,8 @@ pub fn add_registry_pkg(path: &str, overwrite: bool, bytes: Bytes) -> bool {
 /// Delete a package from the registry.
 pub fn delete_registry_pkg(path: &str) -> bool {
     let mut file_path = path.to_string();
-    if !file_path.ends_with(".zip") {
-        file_path.push_str(".zip");
+    if !file_path.ends_with(".pkg") {
+        file_path.push_str(".pkg");
     }
     fs::remove_file(&file_path).is_ok()
 }
@@ -55,8 +55,8 @@ pub fn delete_registry_pkg(path: &str) -> bool {
 /// Get a registry package.
 pub fn get_registry_pkg(path: &str) -> Option<Bytes> {
     let mut file_path = path.to_string();
-    if !file_path.ends_with(".zip") {
-        file_path.push_str(".zip");
+    if !file_path.ends_with(".pkg") {
+        file_path.push_str(".pkg");
     }
     
     let exists = fs::exists(&file_path);
@@ -74,8 +74,8 @@ pub fn get_registry_pkg(path: &str) -> Option<Bytes> {
 #[allow(unused)]
 pub fn create_registry_doc(path: &str) -> Option<SDoc> {
     let mut file_path = path.to_string();
-    if !file_path.ends_with(".zip") {
-        file_path.push_str(".zip");
+    if !file_path.ends_with(".pkg") {
+        file_path.push_str(".pkg");
     }
     
     let exists = fs::exists(&file_path);
