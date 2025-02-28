@@ -17,6 +17,9 @@
 mod response;
 use response::StofResponse;
 
+mod sandbox_fs;
+use sandbox_fs::TmpFileSystemLibrary;
+
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 use axum::{body::Bytes, extract::{Path, Query, State}, http::{header::CONTENT_TYPE, HeaderMap, StatusCode}, response::IntoResponse, routing::{get, post}, Router};
 use stof::{SDoc, SField, SUnits, SVal};
@@ -257,15 +260,15 @@ async fn post_request_handler(State(state): State<ServerState>, Query(query): Qu
         }
         
         let mut doc = SDoc::default();
-        let res;
+        sandbox_document(&mut doc, state.clone()).await;
+        let mut loaded_sbfs = false;
         if content_type == "pkg" {
-            // need to import the pkg before we sandbox the document of course...
-            // TODO: security vulnerability - a hack could be executing a package and using the fs lib to crawl this server...
-            res = doc.header_import("main", &content_type, &content_type, &mut body, "");
-            sandbox_document(&mut doc, state.clone()).await;
-        } else {
-            sandbox_document(&mut doc, state.clone()).await;
-            res = doc.header_import("main", &content_type, &content_type, &mut body, "");
+            doc.load_lib(Arc::new(TmpFileSystemLibrary::default()));
+            loaded_sbfs = true;
+        }
+        let res = doc.header_import("main", &content_type, &content_type, &mut body, "");
+        if loaded_sbfs {
+            doc.libraries.libraries.remove("fs");
         }
         
         match res {
